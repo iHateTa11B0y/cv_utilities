@@ -85,8 +85,10 @@ def vis_one_image_opencv(
             tag_bg_colors=tags_bg_colors,
             tag_font_scale=0.6
             )
-    #cv2.imshow('boxes', image)
-    #cv2.waitKey()
+
+    if segms is None: 
+        return image
+
     image = add_on_segms(
             image, 
             segms,
@@ -95,8 +97,7 @@ def vis_one_image_opencv(
             show_border=True,
             border_thick=1,
             )
-    cv2.imshow('image', image)
-    cv2.waitKey()
+
     return image
 
 if __name__=='__main__':
@@ -115,4 +116,6 @@ if __name__=='__main__':
     boxes = [a['bbox'] for a in anno_data]
     segms = [a['segmentation'] for a in anno_data]
     tags = [str(a['type_id']) for a in anno_data]
-    vis_one_image_opencv(image,boxes,segms,tags,auto_color=True)
+    image_show = vis_one_image_opencv(image,boxes,segms,tags,auto_color=True)
+    cv2.imwrite('image.jpg', image_show)
+    #cv2.waitKey()
