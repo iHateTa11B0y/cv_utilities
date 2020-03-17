@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
 from color_utils import get_color
+import pycocotools.mask as mask_utils
 
 GRAY = (218, 227, 218)
 WHITE = (255, 255, 255)
@@ -34,17 +35,26 @@ def add_on_boxes(
 
     return image
 
-def add_on_segms(image, segms, colors, alpha=0.4, show_border=True, border_thick=1):
+def add_on_segms(image, segms, colors, alpha=0.4, show_border=True, border_thick=1, rle=False):
     img = image.astype(np.float32)
     borders = []
     for ss, c in zip(segms, colors):
-        mask = np.zeros(img.shape[:2], dtype=np.int8)
-        ss = np.array([ss])
-        ss = ss.reshape((1,-1,2))
-        s = np.array(ss, dtype=np.int)
-        mask = cv2.fillPoly(mask, s, 255)
-        borders.append(s)
-        bbox_mask = (mask > 50).astype(np.bool)
+        if not rle:
+            bbox_mask = np.zeros(img.shape[:2], dtype=np.int8).astype(np.bool)
+            for s in ss:
+                mask = np.zeros(img.shape[:2], dtype=np.int8)
+                ss = np.array([[s]])
+                ss = ss.reshape((1,-1,2))
+                ss = np.array(ss, dtype=np.int)
+                mask = cv2.fillPoly(mask, ss, 255)
+                borders.append(ss)
+                bbox_mask |= (mask > 50).astype(np.bool)
+        else:
+            mask = mask_utils.decode(ss)
+            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
+            #contours = [np.squeeze(arr) for arr in contours if len(arr) > 2]
+            borders.append(contours)
+            bbox_mask = (mask > 0).astype(np.bool)
         img[bbox_mask] = img[bbox_mask] * (1-alpha) + np.array(c) * alpha
     if show_border:
         for s in borders:
@@ -57,6 +67,7 @@ def vis_one_image_opencv(
         segms=None,  # poly
         tags=None,
         auto_color=False,
+        rle=False,
         ):
     if segms is not None and len(segms) != len(boxes):
         print('length mismath for segms and boxes.')
@@ -96,6 +107,7 @@ def vis_one_image_opencv(
             alpha=0.4,
             show_border=True,
             border_thick=1,
+            rle=rle,
             )
 
     return image
@@ -116,6 +128,6 @@ if __name__=='__main__':
     boxes = [a['bbox'] for a in anno_data]
     segms = [a['segmentation'] for a in anno_data]
     tags = [str(a['type_id']) for a in anno_data]
-    image_show = vis_one_image_opencv(image,boxes,segms,tags,auto_color=True)
+    image_show = vis_one_image_opencv(image,boxes,segms,tags,auto_color=True,rle=True)
     cv2.imwrite('image.jpg', image_show)
     #cv2.waitKey()
