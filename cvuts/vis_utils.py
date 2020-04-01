@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from color_utils import get_color
+from cvuts.color_utils import get_color
 import pycocotools.mask as mask_utils
 
 GRAY = (218, 227, 218)
@@ -27,19 +27,19 @@ def add_on_boxes(
         if tags is not None:
             txt, tbc = tags[idx], tag_bg_colors[idx]
             ((txt_w, txt_h), _) = cv2.getTextSize(txt, font, tag_font_scale, 1)
-            back_tl = x0, y0 - int(1.3 * txt_h)
+            back_tl = x0, y0 + int(1.3 * txt_h)
             back_br = x0 + txt_w, y0
             cv2.rectangle(image, back_tl, back_br, tbc, -1)
-            txt_tl = x0, y0 - int(0.3 * txt_h)
+            txt_tl = x0, y0 + int(1. * txt_h)
             cv2.putText(image, txt, txt_tl, font, tag_font_scale, tag_color, lineType=cv2.LINE_AA)
 
     return image
 
-def add_on_segms(image, segms, colors, alpha=0.4, show_border=True, border_thick=1, rle=False):
+def add_on_segms(image, segms, colors, alpha=0.4, show_border=True, border_thick=1, segm_type='poly'):
     img = image.astype(np.float32)
     borders = []
     for ss, c in zip(segms, colors):
-        if not rle:
+        if segm_type=='poly':
             bbox_mask = np.zeros(img.shape[:2], dtype=np.int8).astype(np.bool)
             for s in ss:
                 mask = np.zeros(img.shape[:2], dtype=np.int8)
@@ -49,12 +49,16 @@ def add_on_segms(image, segms, colors, alpha=0.4, show_border=True, border_thick
                 mask = cv2.fillPoly(mask, ss, 255)
                 borders.append(ss)
                 bbox_mask |= (mask > 50).astype(np.bool)
-        else:
+        elif segm_type=='rle':
             mask = mask_utils.decode(ss)
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_TC89_KCOS)
             #contours = [np.squeeze(arr) for arr in contours if len(arr) > 2]
             borders.append(contours)
             bbox_mask = (mask > 0).astype(np.bool)
+        elif segm_type=='bimask':
+            bbox_mask = (ss > 0).astype(np.bool)
+        else:
+            raise ValueError
         img[bbox_mask] = img[bbox_mask] * (1-alpha) + np.array(c) * alpha
     if show_border:
         for s in borders:
@@ -67,7 +71,7 @@ def vis_one_image_opencv(
         segms=None,  # poly
         tags=None,
         auto_color=False,
-        rle=False,
+        segm_type='poly',
         ):
     if segms is not None and len(segms) != len(boxes):
         print('length mismath for segms and boxes.')
@@ -107,27 +111,8 @@ def vis_one_image_opencv(
             alpha=0.4,
             show_border=True,
             border_thick=1,
-            rle=rle,
+            segm_type=segm_type,
             )
 
     return image
 
-if __name__=='__main__':
-    import json
-    from image_loader import ImageLoader
-    imloader = ImageLoader('opencv', 'bgr')
-    data = json.load(open('/core1/data/home/niuwenhao/training_data/training/youbao_all.json', 'r'))
-    for i in data['images']:
-        if int(i['id']) == 62322:
-            im_data = i
-    anno_data = []
-    for a in data['annotations']:
-        if int(a['image_id']) == 62322:
-            anno_data.append(a)
-    image = imloader.load(im_data['file_name'])
-    boxes = [a['bbox'] for a in anno_data]
-    segms = [a['segmentation'] for a in anno_data]
-    tags = [str(a['type_id']) for a in anno_data]
-    image_show = vis_one_image_opencv(image,boxes,segms,tags,auto_color=True,rle=True)
-    cv2.imwrite('image.jpg', image_show)
-    #cv2.waitKey()
