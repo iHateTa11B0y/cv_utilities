@@ -75,7 +75,7 @@ def vis_one_image_opencv(
         ):
     if segms is not None and len(segms) != len(boxes):
         print('length mismath for segms and boxes.')
-        raise
+        segms = None
     if tags is not None and len(tags) != len(boxes):
         print('length mismath for scores and boxes.')
         raise

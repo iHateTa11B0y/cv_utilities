@@ -108,13 +108,23 @@ class COCO(COCO_):
         info = {
                  'Image Number': len(self.imgs),
                  'Anno Number': len(self.anns),
-                 'Categories': list(self.catToImgs.keys()),
+                 'Categories': self.dataset['categories'], 
                }
         for k, v in info.items():
             print('  {:<20s} {}'.format(k,v))
 
+        cats = list(self.catToImgs.keys())
+        cats.sort()
+        cnts = []
+        names = []
+        print('* Exist cats')
+        for c in cats:
+            cnts.append(len(self.getAnnIds(catIds=[c])))
+            names.append(self.cats[c]['name'])
+        for c, n, cnt in zip(cats, names, cnts):
+            print(' '*2+'{:<5s} {:<30s} {:<10s}'.format(str(c),str(n),str(cnt)))
 
-    def showImgs(self, imgIds=[], catIds=[], areaRng=[], iscrowd=None, typeIds=[]):
+    def showImgs(self, imgIds=[], catIds=[], areaRng=[], iscrowd=None, typeIds=[], skip=1):
         """
         Show images and annotations that satisfy given filter conditions. default skips that filter
         :param imgIds  (int array)     : get anns for given imgs
@@ -124,23 +134,35 @@ class COCO(COCO_):
         :return: ids (int array)       : integer array of ann ids
         """
         # remove imput image ids which not in annotation file
-        filter_imgIds = []
+        filter_imgIds = []  # make sure that [] would not pass to getImgIds if no imid in dataset
         for i in imgIds:
             if i in self.imgs.keys():
                 filter_imgIds.append(i)
-        img_ids = self.getImgIds(filter_imgIds, catIds)
+        if len(filter_imgIds) > 0 or len(imgIds)==0:
+            img_ids = self.getImgIds(filter_imgIds, catIds)
+        else:
+            img_ids = []
+        #print(img_ids)
 
-        for imid in img_ids:
+        img_cnt = 0
+        for idx, imid in enumerate(img_ids):
+            if (idx+1) % skip != 0:
+                continue
             image = self.loadImgs(imid)[0]
             anids = self.getAnnIds(imid, catIds, areaRng, iscrowd, typeIds=typeIds)
             if len(anids) == 0: continue
+            img_cnt += 1
             annos = self.loadAnns(anids)
             
             print(image['file_name'])
             image_arr = self.imloader.load(image['file_name'])
             boxes = [a['bbox'] for a in annos]
             if len(boxes) == 0: continue
-            segms = [a['segmentation'] for a in annos]
+            print(annos[0])
+            if annos[0]['segmentation']:
+                segms = [a['segmentation'] for a in annos if len(a['segmentation']) > 0 and len(a['segmentation'][0])>2]
+            else:
+                segms = None
 
             tags = build_tag(annos, [1, len(areaRng)>0, iscrowd is not None, len(typeIds)>0])
             #tags = ['type: {}, cat: {}, iscrowd: {}'.format(a['type_id'], a['category_id'],a['iscrowd']) for a in annos]
@@ -151,6 +173,7 @@ class COCO(COCO_):
             wname = 'image'
             cv2.imshow(wname, image_show)
             cv2.waitKey()
+        print('total related images: {}'.format(img_cnt))
 
 
 def build_tag(annos, fields=[0,0,0,0]):

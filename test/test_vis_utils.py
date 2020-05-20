@@ -1,4 +1,6 @@
 from cvuts.image_loader import ImageLoader
+from cvuts.vis_utils import vis_one_image_opencv
+import cv2
 
 def test_vis():
     import json
@@ -10,3 +12,6 @@ def test_vis():
     image_show = vis_one_image_opencv(image,boxes,segms,tags,auto_color=True,segm_type='poly')
     cv2.imshow('image.jpg', image_show)
     cv2.waitKey()
+
+if __name__=='__main__':
+    test_vis()
